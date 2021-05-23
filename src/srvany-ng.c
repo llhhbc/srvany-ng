@@ -23,6 +23,8 @@
  */
 #include <Windows.h>
 #include <tchar.h> //For _tmain().
+#include <stdio.h>
+#include <stdlib.h>
 
 #define MAX_DATA_LENGTH 8192              //Max length of a registry value
 #define MAX_KEY_LENGTH  MAX_PATH          //Max length of a registry path
@@ -31,6 +33,12 @@
 SERVICE_STATUS_HANDLE g_StatusHandle     = NULL;
 HANDLE                g_ServiceStopEvent = INVALID_HANDLE_VALUE;
 PROCESS_INFORMATION   g_Process          = { 0 };
+
+//#define MYDEBUG
+
+#ifdef MYDEBUG
+FILE *fptr;
+#endif
 
 
 /*
@@ -83,11 +91,30 @@ void ServiceSetState(DWORD acceptedControls, DWORD newState, DWORD exitCode)
  */
 void WINAPI ServiceCtrlHandler(DWORD CtrlCode)
 {
+	char cmd[1024];
+	int ok;
     switch (CtrlCode)
     {
     case SERVICE_CONTROL_STOP:
         SetEvent(g_ServiceStopEvent); //Kill the worker thread.
-        TerminateProcess(g_Process.hProcess, 0); //Kill the target process.
+		sprintf_s(cmd, 1024, "taskkill /F /T /PID %ld ", g_Process.dwProcessId);
+#ifdef MYDEBUG
+		fprintf(fptr, cmd);
+		fflush(fptr);
+#endif
+		ok = system(cmd);
+#ifdef MYDEBUG
+		fprintf(fptr, "do system %d", ok);
+#endif
+		/* ok = SetConsoleCtrlHandler(0, 1);
+		fprintf(fptr, "set ctrl %d", ok);
+		ok = GenerateConsoleCtrlEvent(CTRL_C_EVENT, g_Process.dwProcessId);
+		fprintf(fptr, "gen ctrl %d", ok);
+		ok = SetConsoleCtrlHandler(0, 0);
+		fprintf(fptr, "set ctrl %d", ok);
+		fflush(fptr);
+		Sleep(10 * 1000);*/
+        //TerminateProcess(g_Process.hProcess, 0); //Kill the target process.
         ServiceSetState(0, SERVICE_STOPPED, 0);
         break;
 
@@ -127,6 +154,7 @@ void WINAPI ServiceMain(DWORD argc, TCHAR *argv[])
     TCHAR* appStringWithParams    = (TCHAR*)calloc(MAX_DATA_LENGTH * 2, sizeof(TCHAR));
     HKEY   openedKey;
     DWORD  cbData;
+
 
     if (keyPath == NULL || applicationString == NULL || applicationDirectory == NULL || applicationParameters == NULL || applicationEnvironment == NULL || appStringWithParams == NULL)
     {
@@ -208,7 +236,7 @@ void WINAPI ServiceMain(DWORD argc, TCHAR *argv[])
     //Append parameters to the target command string.
     wsprintf(appStringWithParams, TEXT("%s %s"), applicationString, applicationParameters);
 
-    DWORD dwFlags = CREATE_NO_WINDOW;
+	DWORD dwFlags = CREATE_NO_WINDOW;
 
 //Need to specify this for Unicode envars, not needed for MBCS builds.
 #ifdef UNICODE
@@ -243,6 +271,12 @@ int _tmain(int argc, TCHAR *argv[])
     UNREFERENCED_PARAMETER(argc);
     UNREFERENCED_PARAMETER(argv);
 
+#ifdef MYDEBUG
+	fptr = fopen("D:\\lilh\\svrany.log", "w");
+	fprintf(fptr, "mytest file write. ");
+	fflush(fptr);
+#endif
+
     SERVICE_TABLE_ENTRY ServiceTable[] =
     {
         { SERVICE_NAME, (LPSERVICE_MAIN_FUNCTION)ServiceMain },
@@ -253,6 +287,9 @@ int _tmain(int argc, TCHAR *argv[])
     {
         return GetLastError();
     }
+#ifdef MYDEBUG
+	fclose(fptr);
+#endif
 
     return 0;
 }//end main()
