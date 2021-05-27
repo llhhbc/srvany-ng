@@ -257,7 +257,7 @@ void WINAPI ServiceMain(DWORD argc, TCHAR *argv[])
     }
 
     CloseHandle(g_ServiceStopEvent);
-    ServiceSetState(0, SERVICE_STOPPED, 0);
+    ServiceSetState(0, SERVICE_STOPPED, 100); //exit with error
 }//end ServiceMain()
 
 
